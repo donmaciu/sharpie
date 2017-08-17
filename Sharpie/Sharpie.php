@@ -1,14 +1,16 @@
 <?php
 
-class Sharpie{
+abstract class Sharpie implements JsonSerializable{
     
     
     //getters
-    public function __get($name){
+    public function &__get($name){
         if(method_exists($this , 'get_'.$name)){
             return $this->{'get_'.$name}();
-        } else if(property_exists($this, $name)){
-            return $this->{$name};
+        } else if($this->is_public($name)){          
+           return $this->{$name};
+        } else {
+            throw new Exception("Property ".$name." is not public and there are no getters defined");
         }
         
     }
@@ -17,8 +19,10 @@ class Sharpie{
     public function __set($name, $value) {
         if(method_exists($this , 'set_'.$name)){
             $this->{'set_'.$name}($value);
-        } else if(property_exists($this, $name)){
+        } else if($this->is_public($name)){
             $this->{$name} = $value;
+        } else {
+            throw new Exception("Property ".$name." is not public and there are no setters defined");
         }
         
     }
@@ -59,5 +63,51 @@ class Sharpie{
         }
         
         return False;
+    }
+    
+    
+    //Serialization
+    public function jsonSerialize() {
+        $obj = new \stdClass();
+        
+        //iterates through public properties
+        foreach(call_user_func('get_object_vars', $this) as $property){
+            $obj->{$property} = $this->{$property};
+        }
+        
+        foreach (get_class_methods($this) as $item){
+                if(method_exists($this, $item)){
+                    $method = $this->method_getter($item);
+                  
+                    if($method != null){   
+                    
+                        $obj->{str_replace("get_", '', $method)} = $this->{$method}();
+                    }
+                }
+            
+        }
+        
+        
+        return $obj;
+    }
+    
+    protected function is_public($tested_property){
+        foreach(call_user_func('get_object_vars', $this) as $property){
+            if($tested_property == $property){
+                return TRUE;
+            }
+        }
+        
+        return FALSE;
+    }
+
+
+    protected function method_getter($method){
+        if(strpos($method , 'get_') == 0 && strpos($method , 'get_')!== False){
+            return $method;
+            
+        }
+        
+        return null;
     }
 }
